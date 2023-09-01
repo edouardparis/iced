@@ -85,6 +85,30 @@ where
         }
     }
 
+    /// Adds a filter to the [`Subscription`] context.
+    ///
+    /// The value will be part of the identity of a [`Subscription`].
+    pub fn with_filter(
+        mut self,
+        filter: fn(&E) -> bool,
+    ) -> Subscription<H, E, O>
+    where
+        H: 'static,
+        E: 'static,
+        O: 'static,
+    {
+        Subscription {
+            recipes: self
+                .recipes
+                .drain(..)
+                .map(|recipe| {
+                    Box::new(Filtered::new(recipe, filter))
+                        as Box<dyn Recipe<H, E, Output = O>>
+                })
+                .collect(),
+        }
+    }
+
     /// Transforms the [`Subscription`] output with the given function.
     pub fn map<A>(mut self, f: fn(O) -> A) -> Subscription<H, E, A>
     where
@@ -139,6 +163,11 @@ pub trait Recipe<Hasher: std::hash::Hasher, Event> {
     /// This is used by runtimes to uniquely identify a [`Subscription`].
     fn hash(&self, state: &mut Hasher);
 
+    /// If set to true recipe is concerned by event.
+    fn concerned_by(&self) -> fn(&Event) -> bool {
+        |_| true
+    }
+
     /// Executes the [`Recipe`] and produces the stream of events of its
     /// [`Subscription`].
     ///
@@ -179,6 +208,10 @@ where
         self.mapper.hash(state);
     }
 
+    fn concerned_by(&self) -> fn(&E) -> bool {
+        self.recipe.concerned_by()
+    }
+
     fn stream(self: Box<Self>, input: BoxStream<E>) -> BoxStream<Self::Output> {
         use futures::StreamExt;
 
@@ -215,6 +248,10 @@ where
         self.recipe.hash(state);
     }
 
+    fn concerned_by(&self) -> fn(&E) -> bool {
+        self.recipe.concerned_by()
+    }
+
     fn stream(self: Box<Self>, input: BoxStream<E>) -> BoxStream<Self::Output> {
         use futures::StreamExt;
 
@@ -225,5 +262,43 @@ where
                 .stream(input)
                 .map(move |element| (value.clone(), element)),
         )
+    }
+}
+
+struct Filtered<Hasher, Event, A> {
+    recipe: Box<dyn Recipe<Hasher, Event, Output = A>>,
+    filter: fn(&Event) -> bool,
+}
+
+impl<H, E, A> Filtered<H, E, A> {
+    fn new(
+        recipe: Box<dyn Recipe<H, E, Output = A>>,
+        filter: fn(&E) -> bool,
+    ) -> Self {
+        Filtered { recipe, filter }
+    }
+}
+
+impl<H, E, A> Recipe<H, E> for Filtered<H, E, A>
+where
+    A: 'static,
+    H: std::hash::Hasher,
+{
+    type Output = A;
+
+    fn hash(&self, state: &mut H) {
+        use std::hash::Hash;
+
+        std::any::TypeId::of::<A>().hash(state);
+        (self.filter).hash(state);
+        self.recipe.hash(state);
+    }
+
+    fn concerned_by(&self) -> fn(&E) -> bool {
+        self.filter
+    }
+
+    fn stream(self: Box<Self>, input: BoxStream<E>) -> BoxStream<Self::Output> {
+        self.recipe.stream(input)
     }
 }

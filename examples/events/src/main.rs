@@ -70,7 +70,20 @@ impl Application for Events {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        iced_native::subscription::events().map(Message::EventOccurred)
+        if self.enabled {
+            iced_native::subscription::events().map(Message::EventOccurred)
+        } else {
+            iced_native::subscription::events()
+                .with_filter(|(event, _status)| {
+                    matches!(
+                        event,
+                        iced::Event::Window(
+                            iced_native::window::Event::CloseRequested
+                        )
+                    )
+                })
+                .map(Message::EventOccurred)
+        }
     }
 
     fn view(&self) -> Element<Message> {

@@ -17,10 +17,16 @@ pub struct Tracker<Hasher, Event> {
     _hasher: PhantomData<Hasher>,
 }
 
-#[derive(Debug)]
 pub struct Execution<Event> {
     _cancel: futures::channel::oneshot::Sender<()>,
     listener: Option<futures::channel::mpsc::Sender<Event>>,
+    concerned_by: fn(&Event) -> bool,
+}
+
+impl<Event> std::fmt::Debug for Execution<Event> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#?}", self.listener)
+    }
 }
 
 impl<Hasher, Event> Tracker<Hasher, Event>
@@ -88,6 +94,8 @@ where
                 continue;
             }
 
+            let concerned_by = recipe.concerned_by();
+
             let (cancel, mut canceled) = futures::channel::oneshot::channel();
 
             // TODO: Use bus if/when it supports async
@@ -121,6 +129,7 @@ where
                     } else {
                         Some(event_sender)
                     },
+                    concerned_by,
                 },
             );
 
@@ -145,7 +154,15 @@ where
     pub fn broadcast(&mut self, event: Event) {
         self.subscriptions
             .values_mut()
-            .filter_map(|connection| connection.listener.as_mut())
+            .filter_map(|connection| {
+                if connection.listener.is_some()
+                    && (connection.concerned_by)(&event)
+                {
+                    connection.listener.as_mut()
+                } else {
+                    None
+                }
+            })
             .for_each(|listener| {
                 if let Err(error) = listener.try_send(event.clone()) {
                     log::warn!(
