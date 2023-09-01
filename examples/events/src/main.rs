@@ -74,7 +74,21 @@ impl Application for Events {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        event::listen().map(Message::EventOccurred)
+        if self.enabled {
+            event::listen().map(Message::EventOccurred)
+        } else {
+            event::listen()
+                .with_filter(|(event, _status)| {
+                    matches!(
+                        event,
+                        iced::Event::Window(
+                            window::Id::MAIN,
+                            ::Event::CloseRequested
+                        )
+                    )
+                })
+                .map(Message::EventOccurred)
+        }
     }
 
     fn view(&self) -> Element<Message> {

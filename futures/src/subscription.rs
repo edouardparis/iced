@@ -88,6 +88,28 @@ impl<Message> Subscription<Message> {
         }
     }
 
+    /// Adds a filter to the [`Subscription`] context.
+    ///
+    /// The value will be part of the identity of a [`Subscription`].
+    pub fn with_filter(
+        mut self,
+        filter: fn(&Event) -> bool,
+    ) -> Subscription<Message>
+    where
+        Message: 'static,
+    {
+        Subscription {
+            recipes: self
+                .recipes
+                .drain(..)
+                .map(|recipe| {
+                    Box::new(Filtered::new(recipe, filter))
+                        as Box<dyn Recipe<Output = Message>>
+                })
+                .collect(),
+        }
+    }
+
     /// Transforms the [`Subscription`] output with the given function.
     ///
     /// # Panics
@@ -150,6 +172,11 @@ pub trait Recipe {
     ///
     /// This is used by runtimes to uniquely identify a [`Subscription`].
     fn hash(&self, state: &mut Hasher);
+
+    /// If set to true recipe is concerned by event.
+    fn concerned_by(&self) -> fn(&Event) -> bool {
+        |_| true
+    }
 
     /// Executes the [`Recipe`] and produces the stream of events of its
     /// [`Subscription`].
@@ -229,6 +256,40 @@ where
                 .stream(input)
                 .map(move |element| (value.clone(), element)),
         )
+    }
+}
+
+struct Filtered<A> {
+    recipe: Box<dyn Recipe<Output = A>>,
+    filter: fn(&Event) -> bool,
+}
+
+impl<A> Filtered<A> {
+    fn new(
+        recipe: Box<dyn Recipe<Output = A>>,
+        filter: fn(&Event) -> bool,
+    ) -> Self {
+        Filtered { recipe, filter }
+    }
+}
+
+impl<A> Recipe for Filtered<A>
+where
+    A: 'static,
+{
+    type Output = A;
+
+    fn hash(&self, state: &mut Hasher) {
+        std::any::TypeId::of::<fn(&Event) -> bool>().hash(state);
+        self.recipe.hash(state);
+    }
+
+    fn concerned_by(&self) -> fn(&Event) -> bool {
+        self.filter
+    }
+
+    fn stream(self: Box<Self>, input: EventStream) -> BoxStream<Self::Output> {
+        self.recipe.stream(input)
     }
 }
 

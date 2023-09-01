@@ -21,10 +21,16 @@ pub struct Tracker {
     subscriptions: HashMap<u64, Execution>,
 }
 
-#[derive(Debug)]
 pub struct Execution {
     _cancel: futures::channel::oneshot::Sender<()>,
     listener: Option<futures::channel::mpsc::Sender<(Event, event::Status)>>,
+    concerned_by: fn(&Event) -> bool,
+}
+
+impl std::fmt::Debug for Execution {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:#?}", self.listener)
+    }
 }
 
 impl Tracker {
@@ -86,6 +92,8 @@ impl Tracker {
                 continue;
             }
 
+            let concerned_by = recipe.concerned_by();
+
             let (cancel, mut canceled) = futures::channel::oneshot::channel();
 
             // TODO: Use bus if/when it supports async
@@ -119,6 +127,7 @@ impl Tracker {
                     } else {
                         Some(event_sender)
                     },
+                    concerned_by,
                 },
             );
 
@@ -143,7 +152,15 @@ impl Tracker {
     pub fn broadcast(&mut self, event: Event, status: event::Status) {
         self.subscriptions
             .values_mut()
-            .filter_map(|connection| connection.listener.as_mut())
+            .filter_map(|connection| {
+                if connection.listener.is_some()
+                    && (connection.concerned_by)(&event)
+                {
+                    connection.listener.as_mut()
+                } else {
+                    None
+                }
+            })
             .for_each(|listener| {
                 if let Err(error) = listener.try_send((event.clone(), status)) {
                     log::warn!(
