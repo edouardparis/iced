@@ -290,8 +290,10 @@ where
         use std::hash::Hash;
 
         std::any::TypeId::of::<A>().hash(state);
-        (self.filter).hash(state);
         self.recipe.hash(state);
+
+        // requires rust 1.70
+        //(self.filter).hash(state);
     }
 
     fn concerned_by(&self) -> fn(&E) -> bool {
