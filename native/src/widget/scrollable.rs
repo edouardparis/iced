@@ -479,8 +479,12 @@ pub fn update<Message>(
         )
     };
 
-    if let event::Status::Captured = event_status {
-        return event::Status::Captured;
+    if !(mouse_over_scrollable
+        && matches!(event, Event::Mouse(mouse::Event::WheelScrolled { .. })))
+    {
+        if let event::Status::Captured = event_status {
+            return event::Status::Captured;
+        }
     }
 
     if let Event::Keyboard(keyboard::Event::ModifiersChanged(modifiers)) = event
