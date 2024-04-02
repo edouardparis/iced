@@ -11,7 +11,7 @@ categories.workspace = true
 keywords.workspace = true
 
 [dependencies]
-iced_core.workspace = true
+iced_core.version = "0.12"
 iced_core.features = ["palette"]
 
 palette.workspace = true
