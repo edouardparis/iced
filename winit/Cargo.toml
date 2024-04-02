@@ -22,9 +22,9 @@ wayland-csd-adwaita = ["winit/wayland-csd-adwaita"]
 multi-window = ["iced_runtime/multi-window"]
 
 [dependencies]
-iced_graphics.workspace = true
-iced_runtime.workspace = true
-iced_style.workspace = true
+iced_graphics = "0.12"
+iced_runtime = "0.12"
+iced_style = "0.12"
 
 log.workspace = true
 thiserror.workspace = true
