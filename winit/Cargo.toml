@@ -2,13 +2,7 @@
 name = "iced_winit"
 description = "A runtime for iced on top of winit"
 version = "0.12.3"
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-repository.workspace = true
-homepage.workspace = true
-categories.workspace = true
-keywords.workspace = true
+edition = "2021"
 
 [features]
 default = ["x11", "wayland", "wayland-dlopen", "wayland-csd-adwaita"]

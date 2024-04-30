@@ -2,13 +2,7 @@
 name = "iced_style"
 description = "The default set of styles of Iced"
 version = "0.12.3"
-edition.workspace = true
-authors.workspace = true
-license.workspace = true
-repository.workspace = true
-homepage.workspace = true
-categories.workspace = true
-keywords.workspace = true
+edition = "2021"
 
 [dependencies]
 iced_core.version = "0.12"
